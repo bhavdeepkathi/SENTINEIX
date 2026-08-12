@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import auth, logs, alerts, ml, incidents, evidence, investigations
+from app.api import auth, logs, alerts, ml, incidents, evidence, investigations, recommendations
 from app.core.database import init_db
 from app.models.user import Role
 from app.core.database import AsyncSessionLocal
@@ -14,6 +14,7 @@ app.include_router(ml.router)
 app.include_router(incidents.router)
 app.include_router(evidence.router)      
 app.include_router(investigations.router)
+app.include_router(recommendations.router)
 
 @app.on_event("startup")
 async def on_startup():

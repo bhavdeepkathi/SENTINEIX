@@ -15,7 +15,7 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 @router.post("/run-detection", response_model=List[AlertRead], status_code=status.HTTP_201_CREATED)
 async def run_detection(
-    since_minutes: int = Query(60, ge=1, le=1440),
+    since_minutes: int = Query(60, ge=1, le=1000000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role("analyst", "admin", "investigator"))
 ):

@@ -13,6 +13,7 @@ from app.models.log_event import LogEvent
 from app.models.evidence import Evidence
 from app.models.investigation import Investigation, Recommendation
 from app.schemas.incident import IncidentRead, IncidentCreate, IncidentUpdate
+from app.schemas.investigation import RecommendationCreate, RecommendationRead
 from app.schemas.mitre import IncidentMitreMapping
 from app.schemas.investigation import InvestigationRead
 from app.services.correlation import CorrelationEngine
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/incidents", tags=["incidents"])
 
 @router.post("/correlate", response_model=List[IncidentRead], status_code=status.HTTP_201_CREATED)
 async def correlate_alerts(
-    since_minutes: int = Query(60, ge=1, le=1440),
+    since_minutes: int = Query(60, ge=1, le=1000000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role("analyst", "admin", "investigator"))
 ):
@@ -284,6 +285,12 @@ async def incident_report(
         for log, seq in tl_rows
     ]
 
+    # fetch incident (needed for report)
+    inc_result = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = inc_result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
     # alerts
     al_stmt = select(Alert).where(Alert.incident_id == incident_id)
     alerts = (await db.execute(al_stmt)).scalars().all()
@@ -390,3 +397,53 @@ async def incident_report(
 
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": f"attachment; filename=incident_{incident_id}_report.pdf"})
+
+@router.post("/{incident_id}/recommendations", response_model=RecommendationRead, status_code=status.HTTP_201_CREATED)
+async def add_manual_recommendation(
+    incident_id: int,
+    payload: RecommendationCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("analyst", "admin", "investigator"))
+):
+    # Ensure incident exists
+    inc_res = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = inc_res.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    # Find existing investigation or create placeholder
+    inv_res = await db.execute(select(Investigation).where(Investigation.incident_id == incident_id))
+    investigation = inv_res.scalar_one_or_none()
+    if not investigation:
+        investigation = Investigation(incident_id=incident_id)
+        db.add(investigation)
+        await db.flush()
+    rec = Recommendation(
+        investigation_id=investigation.id,
+        description=payload.description,
+        priority=payload.priority,
+        is_ai_generated=0,
+    )
+    db.add(rec)
+    await db.commit()
+    await db.refresh(rec)
+    return rec
+
+@router.get("/{incident_id}/recommendations", response_model=List[RecommendationRead])
+async def get_incident_recommendations(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # verify incident exists
+    inc_res = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = inc_res.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    # find investigation, if any
+    inv_res = await db.execute(select(Investigation).where(Investigation.incident_id == incident_id))
+    investigation = inv_res.scalar_one_or_none()
+    if not investigation:
+        return []
+    rec_res = await db.execute(select(Recommendation).where(Recommendation.investigation_id == investigation.id))
+    recs = rec_res.scalars().all()
+    return recs

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../services/api'
-import {
-  FileText, AlertTriangle, Clock, CheckCircle, Brain, Network, Download, ChevronRight, Activity, ShieldAlert
-} from 'lucide-react'
+  import {
+    FileText, AlertTriangle, Clock, CheckCircle, Brain, Network, Download, ChevronRight, Activity, ShieldAlert, Pencil, Check, X, Trash2
+  } from 'lucide-react'
 
 interface Incident {
   id: number
@@ -91,6 +91,11 @@ export default function IncidentDetail() {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [newRecDesc, setNewRecDesc] = useState('')
+  const [newRecPriority, setNewRecPriority] = useState('medium')
+  const [editingRecId, setEditingRecId] = useState<number | null>(null)
+  const [editDesc, setEditDesc] = useState('')
+  const [editPriority, setEditPriority] = useState('')
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -406,21 +411,154 @@ export default function IncidentDetail() {
         )
       case 'recommendations':
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Add new recommendation */}
+            {investigation && (
+              <div className="bg-white shadow rounded-lg p-6">
+                <h2 className="text-lg font-medium mb-4">Add Recommendation</h2>
+                <textarea
+                  className="w-full border rounded p-2 mb-2"
+                  rows={3}
+                  placeholder="Description"
+                  value={newRecDesc}
+                  onChange={(e) => setNewRecDesc(e.target.value)}
+                />
+                <div className="flex items-center mb-2">
+                  <label className="mr-2">Priority:</label>
+                  <select
+                    className="border rounded p-1"
+                    value={newRecPriority}
+                    onChange={(e) => setNewRecPriority(e.target.value)}
+                  >
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!investigation) return;
+                    try {
+                      await api.post(`/incidents/${incidentId}/recommendations`, {
+                        description: newRecDesc,
+                        priority: newRecPriority,
+                      });
+                      const recRes = await api.get(`/incidents/${incidentId}/recommendations`);
+                               setRecommendations(recRes as unknown as Recommendation[]);
+                      setNewRecDesc('');
+                      setNewRecPriority('medium');
+                    } catch (e) {
+                      console.error(e);
+                      alert('Failed to add recommendation');
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Add Recommendation
+                </button>
+              </div>
+            )}
+
+            {/* List recommendations */}
             {recommendations.length === 0 ? (
               <div className="bg-white shadow rounded-lg p-8 text-center text-gray-500">No recommendations</div>
             ) : (
               recommendations.map((rec) => (
                 <div key={rec.id} className="bg-white shadow rounded-lg p-6 border-l-4 border-green-500">
-                  <div className="flex justify-between items-start">
-                    <p className="text-gray-900">{rec.description}</p>
-                    <span className={`text-xs px-2 py-1 rounded ${rec.priority === 'high' ? 'bg-red-100 text-red-800' : rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                      {rec.priority || 'medium'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {rec.is_ai_generated ? '🤖 AI Generated' : '👤 Manual'}
-                  </p>
+                  {editingRecId === rec.id ? (
+                    <>
+                      <textarea
+                        className="w-full border rounded p-2 mb-2"
+                        rows={2}
+                        value={editDesc}
+                        onChange={(e) => setEditDesc(e.target.value)}
+                      />
+                      <div className="flex items-center mb-2">
+                        <label className="mr-2">Priority:</label>
+                        <select
+                          className="border rounded p-1"
+                          value={editPriority}
+                          onChange={(e) => setEditPriority(e.target.value)}
+                        >
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              await api.patch(`/recommendations/${rec.id}`, {
+                                description: editDesc,
+                                priority: editPriority,
+                              });
+                              const recRes = await api.get(`/investigations/${investigation?.id}/recommendations`);
+                              setRecommendations(recRes as unknown as Recommendation[]);
+                              setEditingRecId(null);
+                            } catch (e) {
+                              console.error(e);
+                              alert('Failed to update recommendation');
+                            }
+                          }}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingRecId(null)}
+                          className="px-3 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 flex items-center"
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-start">
+                        <p className="text-gray-900">{rec.description}</p>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-xs px-2 py-1 rounded ${rec.priority === 'high' ? 'bg-red-100 text-red-800' : rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                            {rec.priority || 'medium'}
+                          </span>
+{rec.is_ai_generated ? null : (
+  <>
+    <button
+      onClick={() => {
+        setEditingRecId(rec.id);
+        setEditDesc(rec.description);
+        setEditPriority(rec.priority || '');
+      }}
+      className="text-gray-500 hover:text-gray-700"
+    >
+      <Pencil className="w-4 h-4" />
+    </button>
+    <button
+      onClick={async () => {
+        try {
+          await api.delete(`/recommendations/${rec.id}`);
+          const recRes = await api.get(`/incidents/${incidentId}/recommendations`);
+          setRecommendations(recRes as unknown as Recommendation[]);
+        } catch (e) {
+          console.error(e);
+          alert('Failed to delete recommendation');
+        }
+      }}
+      className="text-red-500 hover:text-red-700"
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  </>
+)}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        {rec.is_ai_generated ? '🤖 AI Generated' : '👤 Manual'}
+                      </p>
+                    </>
+                  )}
                 </div>
               ))
             )}
@@ -482,6 +620,22 @@ case 'report':
             <span className="ml-1 capitalize">{incident.status}</span>
           </span>
           <span className="text-sm text-gray-500">Risk: {incident.risk_score}</span>
+{incident.status !== 'closed' && (
+  <button
+    onClick={async () => {
+      try {
+        await api.patch(`/incidents/${incidentId}`, { status: 'closed' });
+        setIncident({ ...incident, status: 'closed' });
+      } catch (e) {
+        console.error(e);
+        alert('Failed to close incident');
+      }
+    }}
+    className="ml-4 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+  >
+    Close Incident
+  </button>
+)}
         </div>
       </div>
 

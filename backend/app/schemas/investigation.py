@@ -28,6 +28,15 @@ class InvestigationRead(InvestigationBase):
         from_attributes = True
 
 
+class RecommendationCreate(BaseModel):
+    investigation_id: Optional[int] = None
+    description: str
+    priority: Optional[str] = None
+
+class RecommendationUpdate(BaseModel):
+    description: Optional[str] = None
+    priority: Optional[str] = None
+
 class RecommendationRead(BaseModel):
     id: int
     investigation_id: int

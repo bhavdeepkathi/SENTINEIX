@@ -89,7 +89,8 @@ export default function Incidents() {
       const data = await api.get('/incidents?limit=100') as unknown as typeof incidents
       setIncidents(data)
     } catch (e: any) {
-      alert('Detection failed: ' + (e.response?.data?.detail || e.message))
+      const msg = e.response?.data ? JSON.stringify(e.response.data) : (e.message || 'Detection failed')
+      alert('Detection failed: ' + msg)
     } finally {
       setDetecting(false)
     }
@@ -103,7 +104,8 @@ export default function Incidents() {
       const data = await api.get('/incidents?limit=100') as unknown as typeof incidents
       setIncidents(data)
     } catch (e: any) {
-      alert('Correlation failed: ' + (e.response?.data?.detail || e.message))
+      const msg = e.response?.data ? JSON.stringify(e.response.data) : (e.message || 'Correlation failed')
+      alert('Correlation failed: ' + msg)
     } finally {
       setCorrelating(false)
     }
